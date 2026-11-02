@@ -6,7 +6,7 @@
 <title>Flappy Bird</title>
 <style>
   body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; }
-  canvas { background: #70c5ce; max-height: 100vh; }
+  canvas { image-rendering: pixelated; max-height: 100vh; }
 </style>
 </head>
 <body>
@@ -16,6 +16,24 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const GRAVITY = 0.45, FLAP = -7.5, PIPE_W = 60, GAP = 140, PIPE_SPEED = 2.5, PIPE_EVERY = 90;
+
+// 8-bit autumn backdrop: drawn once on a 100x150 grid, scaled 4x
+const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
+(function () {
+  const g = bg.getContext('2d'), P = 4;
+  const r = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x * P, y * P, w * P, h * P); };
+  ['#f9d9a0', '#f7c47a', '#f2a65a', '#e8844a'].forEach((c, i) => r(0, i * 30, 100, 30, c)); // banded sky
+  r(70, 20, 12, 12, '#fff3c4'); r(72, 18, 8, 16, '#fff3c4');                                 // sun
+  for (let x = 0; x < 100; x += 2) r(x, 100 + ((x * 7) % 9), 2, 50, '#a8552b');             // far hills
+  for (let x = 0; x < 100; x += 2) r(x, 112 + ((x * 5) % 6), 2, 40, '#7a3b1d');             // near hills
+  [[8, 6], [30, 9], [52, 5], [76, 8], [92, 6]].forEach(([x, h], i) => {                      // trees
+    const top = 118 - h, c = ['#d9421e', '#f08a24', '#f2c230'][i % 3];
+    r(x + 2, top + 8, 2, h, '#4a2511'); r(x, top, 6, 8, c); r(x + 1, top - 2, 4, 2, c); r(x + 1, top + 3, 2, 2, '#fff3c4');
+  });
+  r(0, 138, 100, 12, '#5a2d14');                                                              // ground
+  for (let x = 0; x < 100; x += 3) r(x, 138 + ((x * 3) % 5), 2, 2, ['#d9421e', '#f08a24', '#f2c230'][x % 3]); // leaves
+  r(0, 137, 100, 1, '#2e1409');
+})();
 
 let bird, pipes, score, frame, state;
 
@@ -63,7 +81,7 @@ function update() {
 }
 
 function draw() {
-  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(bg, 0, 0);
   ctx.fillStyle = '#1e5fd8';
   ctx.strokeStyle = '#123f95';
   ctx.lineWidth = 3;
@@ -74,14 +92,14 @@ function draw() {
     ctx.strokeRect(p.x, p.top + GAP, PIPE_W, H - p.top - GAP);
   }
   ctx.fillStyle = '#ffd93b';
-  ctx.beginPath(); ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(bird.x - 14, bird.y - 12, 28, 24); ctx.fillStyle = '#f08a24'; ctx.fillRect(bird.x + 8, bird.y, 12, 8); ctx.fillStyle = '#fff'; ctx.fillRect(bird.x + 2, bird.y - 8, 10, 10); ctx.fillStyle = '#ffd93b';
   ctx.fillStyle = '#000';
-  ctx.beginPath(); ctx.arc(bird.x + 5, bird.y - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(bird.x + 7, bird.y - 5, 4, 4);
 
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
-  ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center';
+  ctx.font = 'bold 40px monospace'; ctx.textAlign = 'center';
   ctx.strokeText(score, W / 2, 60); ctx.fillText(score, W / 2, 60);
-  ctx.font = 'bold 22px sans-serif';
+  ctx.font = 'bold 18px monospace';
   if (state === 'ready') { ctx.strokeText('Click / Space to flap', W / 2, H / 2 + 60); ctx.fillText('Click / Space to flap', W / 2, H / 2 + 60); }
   if (state === 'dead') { ctx.strokeText('Game over - click to restart', W / 2, H / 2); ctx.fillText('Game over - click to restart', W / 2, H / 2); }
 }
