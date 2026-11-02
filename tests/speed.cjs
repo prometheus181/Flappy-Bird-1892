@@ -6,6 +6,7 @@ const context = vm.createContext({
   document: { getElementById: () => ({ width: 400, height: 600, getContext: () => new Proxy({}, { get: () => () => {} }), addEventListener() {} }) },
   addEventListener() {}, requestAnimationFrame() {},
 });
+context.document.createElement = () => context.document.getElementById();
 vm.runInContext(source, context);
 vm.runInContext(`
   state = 'playing';
@@ -27,6 +28,14 @@ vm.runInContext(`
   pipes = [{ x: 300, top: 100, scored: false }];
   update();
   if (pipes[0].x !== 297.5 || score !== 0) throw new Error('Restart must restore initial speed');
+  reset(); state = 'playing';
+  pipes = [{ x: 90, top: 310, scored: false }];
+  update();
+  if (state !== 'dead') throw new Error('Hitting a pipe must end the game');
+  reset(); state = 'playing';
+  pipes = [{ x: 90, top: 200, scored: false }];
+  update();
+  if (state !== 'playing') throw new Error('Flying through the gap must remain safe');
 `, context);
 assert.ok(true);
 console.log('Passed: per-pipe scoring, compounded 20% speed, restart reset');
