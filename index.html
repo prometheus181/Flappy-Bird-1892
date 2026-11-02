@@ -6,7 +6,7 @@
 <title>Flappy Bird</title>
 <style>
   body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; }
-  canvas { background: #70c5ce; max-height: 100vh; }
+  canvas { image-rendering: pixelated; max-height: 100vh; }
 </style>
 </head>
 <body>
@@ -16,6 +16,24 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const GRAVITY = 0.45, FLAP = -7.5, PIPE_W = 60, GAP = 140, PIPE_SPEED = 2.5, PIPE_EVERY = 90;
+
+// 8-bit autumn backdrop: drawn once on a 100x150 grid, scaled 4x
+const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
+(function () {
+  const g = bg.getContext('2d'), P = 4;
+  const r = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x * P, y * P, w * P, h * P); };
+  ['#f9d9a0', '#f7c47a', '#f2a65a', '#e8844a'].forEach((c, i) => r(0, i * 30, 100, 30, c)); // banded sky
+  r(70, 20, 12, 12, '#fff3c4'); r(72, 18, 8, 16, '#fff3c4');                                 // sun
+  for (let x = 0; x < 100; x += 2) r(x, 100 + ((x * 7) % 9), 2, 50, '#a8552b');             // far hills
+  for (let x = 0; x < 100; x += 2) r(x, 112 + ((x * 5) % 6), 2, 40, '#7a3b1d');             // near hills
+  [[8, 6], [30, 9], [52, 5], [76, 8], [92, 6]].forEach(([x, h], i) => {                      // trees
+    const top = 118 - h, c = ['#d9421e', '#f08a24', '#f2c230'][i % 3];
+    r(x + 2, top + 8, 2, h, '#4a2511'); r(x, top, 6, 8, c); r(x + 1, top - 2, 4, 2, c); r(x + 1, top + 3, 2, 2, '#fff3c4');
+  });
+  r(0, 138, 100, 12, '#5a2d14');                                                              // ground
+  for (let x = 0; x < 100; x += 3) r(x, 138 + ((x * 3) % 5), 2, 2, ['#d9421e', '#f08a24', '#f2c230'][x % 3]); // leaves
+  r(0, 137, 100, 1, '#2e1409');
+})();
 
 let bird, pipes, score, frame, state;
 
@@ -37,8 +55,15 @@ addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault();
 canvas.addEventListener('pointerdown', flap);
 
 function collides(p) {
-  // BUG (intentional): pipe collisions are never detected.
-  return false;
+  const hits = (x, y, w, h) => {
+    const dx = bird.x - Math.max(x, Math.min(bird.x, x + w));
+    const dy = bird.y - Math.max(y, Math.min(bird.y, y + h));
+    return dx * dx + dy * dy <= bird.r * bird.r;
+  };
+  return hits(p.x, 0, PIPE_W, p.top) ||
+    hits(p.x - 4, p.top - 16, PIPE_W + 8, 16) ||
+    hits(p.x, p.top + GAP, PIPE_W, H - p.top - GAP) ||
+    hits(p.x - 4, p.top + GAP, PIPE_W + 8, 16);
 }
 
 function update() {
@@ -63,25 +88,27 @@ function update() {
 }
 
 function draw() {
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#1e5fd8';
-  ctx.strokeStyle = '#123f95';
-  ctx.lineWidth = 3;
-  for (const p of pipes) {
-    ctx.fillRect(p.x, 0, PIPE_W, p.top);
-    ctx.strokeRect(p.x, 0, PIPE_W, p.top);
-    ctx.fillRect(p.x, p.top + GAP, PIPE_W, H - p.top - GAP);
-    ctx.strokeRect(p.x, p.top + GAP, PIPE_W, H - p.top - GAP);
-  }
-  ctx.fillStyle = '#ffd93b';
-  ctx.beginPath(); ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#000';
-  ctx.beginPath(); ctx.arc(bird.x + 5, bird.y - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.drawImage(bg, 0, 0);
+  const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+  // pipe: dark outline, light/mid/dark green bands, wider lip at the opening
+  const pipe = (x, y, h, lipY) => {
+    R(x, y, PIPE_W, h, '#1b3d12'); R(x + 4, y, 8, h, '#9be564'); R(x + 12, y, 24, h, '#4cae2e'); R(x + 36, y, 20, h, '#2f7a1c');
+    R(x - 4, lipY, PIPE_W + 8, 16, '#1b3d12'); R(x, lipY + 4, 8, 8, '#9be564'); R(x + 8, lipY + 4, 28, 8, '#4cae2e'); R(x + 36, lipY + 4, 20, 8, '#2f7a1c');
+  };
+  for (const p of pipes) { pipe(p.x, 0, p.top, p.top - 16); pipe(p.x, p.top + GAP, H - p.top - GAP, p.top + GAP); }
+  // bird: 4px pixel sprite
+  const bx = Math.round(bird.x) - 16, by = Math.round(bird.y) - 12, wing = bird.vy < 0 ? 4 : 12;
+  R(bx + 4, by, 24, 24, '#3a1d08'); R(bx, by + 4, 32, 16, '#3a1d08');           // outline
+  R(bx + 8, by + 4, 16, 16, '#ffd93b'); R(bx + 4, by + 8, 24, 8, '#ffd93b');    // body
+  R(bx + 8, by + 16, 16, 4, '#f08a24');                                           // belly shade
+  R(bx + 16, by + 4, 12, 12, '#fff'); R(bx + 20, by + 8, 4, 4, '#000');           // eye
+  R(bx + 28, by + 12, 8, 8, '#d9421e'); R(bx + 28, by + 12, 8, 2, '#3a1d08');     // beak
+  R(bx + 4, by + wing, 12, 8, '#f08a24'); R(bx + 4, by + wing + 8, 12, 2, '#3a1d08'); // wing
 
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
-  ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center';
+  ctx.font = 'bold 40px monospace'; ctx.textAlign = 'center';
   ctx.strokeText(score, W / 2, 60); ctx.fillText(score, W / 2, 60);
-  ctx.font = 'bold 22px sans-serif';
+  ctx.font = 'bold 18px monospace';
   if (state === 'ready') { ctx.strokeText('Click / Space to flap', W / 2, H / 2 + 60); ctx.fillText('Click / Space to flap', W / 2, H / 2 + 60); }
   if (state === 'dead') { ctx.strokeText('Game over - click to restart', W / 2, H / 2); ctx.fillText('Game over - click to restart', W / 2, H / 2); }
 }
